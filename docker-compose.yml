@@ -39,9 +39,11 @@ services:
       # the SD card; they are intentionally not persisted across reboots.
       - squid_logs:/var/log/squid
     # Ephemeral, write-heavy paths kept in RAM instead of the container
-    # layer / SD card. ssl_db only holds transient signed-cert caches and
-    # is rebuilt on boot; the spool dir is unused now that cache_dir is
-    # disabled but kept off-disk as a belt-and-suspenders measure.
+    # layer / SD card. Both paths hold the transient signed-cert cache
+    # (ssl_db), which entrypoint.sh initializes on boot — /var/lib/squid is
+    # what our Dockerfile configures, and /var/spool/squid is the Ubuntu
+    # package default that some squid-openssl builds resolve to. Neither
+    # survives a restart, which is fine (they're just caches).
     tmpfs:
       - /var/lib/squid:size=64m
       - /var/spool/squid:size=32m

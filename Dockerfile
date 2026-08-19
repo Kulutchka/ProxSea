@@ -28,6 +28,10 @@ RUN sed -i "s|^http_port 3128\s*\$|http_port 3128 ssl-bump generate-host-certifi
 # --- SSL-bump / transparent intercept ---
 http_port 3129 intercept
 https_port 3130 intercept ssl-bump cert=/etc/squid/ssl_cert/squidCA.pem generate-host-certificates=on dynamic_cert_mem_cache_size=4MB
+# ssl_db lives under /var/lib/squid (NOT the Ubuntu default /var/spool/squid).
+# entrypoint.sh initializes it before Squid starts (see "SSL cert database"),
+# so the two must stay in sync. /var/lib/squid is tmpfs-backed in compose, so
+# the DB is rebuilt on every boot — it only caches signed leaf certs.
 sslcrtd_program /usr/lib/squid/security_file_certgen -s /var/lib/squid/ssl_db -M 4MB
 sslcrtd_children 8 startup=1 idle=1
 acl step1 at_step SslBump1

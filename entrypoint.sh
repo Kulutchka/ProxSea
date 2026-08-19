@@ -7,7 +7,6 @@
 set -euo pipefail
 
 CA_DIR="/etc/squid/ssl_cert"
-SSL_DB="/var/lib/squid/ssl_db"
 CERTGEN_BIN="/usr/lib/squid/security_file_certgen"
 
 # ---------------------------------------------------------------------------
@@ -28,31 +27,38 @@ fi
 
 # ---------------------------------------------------------------------------
 # 2. SSL cert database
+#    Squid's sslcrtd_program helper requires a pre-initialized cert DB or it
+#    crashes (and takes Squid down with it) on the first SSL-bumped request.
+#    Our Dockerfile points it at /var/lib/squid/ssl_db, but the Ubuntu package
+#    default is /var/spool/squid/ssl_db — and on some architectures the
+#    squid-openssl package ships that default *active* (uncommented), so Squid
+#    resolves to /var/spool/squid/ssl_db there. Initialize BOTH paths so Squid
+#    starts no matter which one the active config uses. Runs before supervisord
+#    (and therefore before Squid).
 # ---------------------------------------------------------------------------
-mkdir -p /var/lib/squid
-chown proxy:proxy /var/lib/squid
-# Check whether the ssl_db directory actually has content, not just
-# whether it exists — a freshly-mounted, empty named volume will pass
-# a bare `-d` existence test and skip initialization, leaving Squid
-# with an uninitialized ssl_db that crashes sslcrtd_program on every
-# launch (silent, but fatal).
-if [ ! -d "$SSL_DB" ] || [ -z "$(ls -A "$SSL_DB" 2>/dev/null)" ]; then
-  echo "[entrypoint] SSL cert DB missing or empty — initializing (first boot)."
-  # ssl_db is now a normal subdirectory of the /var/lib/squid volume
-  # mount (not a mount point itself), so it's safe to remove entirely
-  # and let security_file_certgen -c create it fresh.
-  rm -rf "$SSL_DB"
-  "$CERTGEN_BIN" -c -s "$SSL_DB" -M 4MB
-else
-  echo "[entrypoint] Existing, populated SSL cert DB found on volume — reusing it."
-fi
-
-# security_file_certgen -c runs as root here (the entrypoint is root), so it
-# creates index.txt/certs/size owned by root. Squid later drops privileges to
-# the proxy user and spawns this same helper as proxy, which then can't lock
-# index.txt — surfacing as "Failed to open file ... index.txt / certificate_db
-# lock" on every SSL-bumped HTTPS request. Re-home the whole DB to proxy.
-chown -R proxy:proxy "$SSL_DB"
+for SSL_DB in /var/lib/squid/ssl_db /var/spool/squid/ssl_db; do
+  PARENT_DIR="$(dirname "$SSL_DB")"
+  mkdir -p "$PARENT_DIR"
+  chown proxy:proxy "$PARENT_DIR"
+  # Check whether the ssl_db directory actually has content, not just whether
+  # it exists — an empty dir (e.g. a freshly-mounted tmpfs) would pass a bare
+  # `-d` test and skip initialization, leaving sslcrtd_program to crash.
+  if [ ! -d "$SSL_DB" ] || [ -z "$(ls -A "$SSL_DB" 2>/dev/null)" ]; then
+    echo "[entrypoint] SSL cert DB missing or empty at $SSL_DB — initializing."
+    # security_file_certgen -c insists on creating the directory itself and
+    # fails with EEXIST if it already exists, so remove it first.
+    rm -rf "$SSL_DB"
+    "$CERTGEN_BIN" -c -s "$SSL_DB" -M 4MB
+  else
+    echo "[entrypoint] Existing, populated SSL cert DB found at $SSL_DB — reusing it."
+  fi
+  # security_file_certgen -c runs as root (entrypoint is root), so it creates
+  # index.txt/certs/size owned by root. Squid later drops privileges to the
+  # proxy user and spawns this helper as proxy, which then can't lock index.txt
+  # — surfacing as "certificate_db lock" on every SSL-bumped request. Re-home
+  # the whole DB to proxy.
+  chown -R proxy:proxy "$SSL_DB"
+done
 
 # ---------------------------------------------------------------------------
 # 3. Managed config (dashboard-owned) — Squid's config Includes
