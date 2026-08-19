@@ -1,3 +1,5 @@
+<span style="color: red"> !!! IMPORTANT: ProxSea Crashes on rpi. Will fix it TOMORROW !!! </span>
+
 # ProxSea
 
 ProxSea is a self-hosted, Docker-based web proxy with SSL inspection, on-access antivirus scanning, and content filtering — all managed from a clean web dashboard.
