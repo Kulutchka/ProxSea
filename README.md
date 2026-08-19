@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/proxsea_logo.jpeg" alt="ProxSea logo" width="280">
+</p>
+
 # ProxSea
 
 ProxSea is a self-hosted, Docker-based web proxy with SSL inspection, on-access antivirus scanning, and content filtering — all managed from a clean web dashboard.
@@ -31,6 +35,10 @@ It bundles three things that normally have to be wired together by hand:
 - **Live log viewer** — watch Squid's `access.log` and `cache.log` in real time.
 - **Client setup page** (`/setup`) — a public page where end users download the CA certificate and get browser-specific instructions for Windows, macOS, Linux, Firefox, Chrome, and Safari.
 - **Light / dark theme** with preference persistence.
+
+<p align="center">
+  <img src="images/proxsea-dashboard.jpg" alt="ProxSea dashboard" width="760">
+</p>
 
 ---
 
