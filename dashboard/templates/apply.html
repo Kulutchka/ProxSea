@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Review & Apply — ProxSea{% endblock %}
+{% block topbar_title %}Review &amp; Apply{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Review &amp; apply</h1>
+    <p class="page-desc">This is the exact Squid configuration that will be written and loaded when you click apply.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Generated configuration</h2>
+    {% if dirty %}
+      <span class="badge warning"><span class="dot"></span>Pending changes</span>
+    {% else %}
+      <span class="badge success"><span class="dot"></span>Up to date</span>
+    {% endif %}
+  </div>
+  <div class="card-body pad-0">
+    <pre class="codeblock">{{ preview }}</pre>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('apply_confirm') }}" class="flex items-center gap-12">
+  <button type="submit" class="btn btn-success btn-lg" {{ 'disabled' if not dirty else '' }}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    Apply changes
+  </button>
+  <span class="text-sm text-muted">
+    Squid reloads without dropping existing connections (<span class="mono">squid -k reconfigure</span>).
+  </span>
+</form>
+
+{% endblock %}

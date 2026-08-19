@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ProxSea{% endblock %}</title>
+  <script>
+    // Apply the saved theme before the stylesheet paints to avoid a flash.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('proxsea-theme'); } catch (e) {}
+      if (t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% if session.get('logged_in') %}
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">ProxSea</div>
+          <div class="brand-sub">Squid · ClamAV Gateway</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-label">Manage</div>
+        <a href="{{ url_for('dashboard_home') }}"
+           class="nav-item {{ 'active' if request.endpoint in ('dashboard_home', 'list_detail') }}">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </span>
+          Lists &amp; Rules
+          {% if dirty %}<span class="nav-badge">•</span>{% endif %}
+        </a>
+        <a href="{{ url_for('error_page_editor') }}"
+           class="nav-item {{ 'active' if request.endpoint == 'error_page_editor' }}">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </span>
+          Block Page
+        </a>
+        <a href="{{ url_for('virus_page_editor') }}"
+           class="nav-item {{ 'active' if request.endpoint == 'virus_page_editor' }}">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </span>
+          Virus Page
+        </a>
+        <a href="{{ url_for('apply_preview') }}"
+           class="nav-item {{ 'active' if request.endpoint in ('apply_preview',) }}">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+          </span>
+          Review &amp; Apply
+          {% if dirty %}<span class="nav-badge">•</span>{% endif %}
+        </a>
+
+        <div class="nav-label">Monitor</div>
+        <a href="{{ url_for('logs_view') }}"
+           class="nav-item {{ 'active' if request.endpoint == 'logs_view' }}">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </span>
+          Logs
+        </a>
+        <a href="{{ url_for('setup_page') }}"
+           class="nav-item {{ 'active' if request.endpoint == 'setup_page' }}">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </span>
+          Client Setup
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="{{ url_for('logout') }}" class="nav-item">
+          <span class="nav-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </span>
+          Sign out
+        </a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-title">{% block topbar_title %}{% endblock %}</div>
+        <div class="topbar-meta">
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle color theme" title="Toggle light/dark">
+            <svg class="theme-ico theme-ico-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+            </svg>
+            <svg class="theme-ico theme-ico-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+          <span class="badge {{ 'warning' if dirty else 'success' }}">
+            <span class="dot"></span>{{ 'Unapplied changes' if dirty else 'Live' }}
+          </span>
+          <span class="text-sm text-muted">Last applied: {{ last_applied }}</span>
+        </div>
+      </header>
+
+      <div class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">
+                <span class="flash-ico">
+                  {% if category == 'error' %}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  {% else %}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  {% endif %}
+                </span>
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="auth-messages">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">
+              <span class="flash-ico">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </span>
+              <span>{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block auth_content %}{% endblock %}
+  {% endif %}
+  {% block scripts %}{% endblock %}
+  <script>
+    (function () {
+      function apply(t) {
+        document.documentElement.setAttribute('data-theme', t);
+        try { localStorage.setItem('proxsea-theme', t); } catch (e) {}
+      }
+      document.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-theme-toggle]') : null;
+        if (!btn) return;
+        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        apply(dark ? 'light' : 'dark');
+      });
+    })();
+  </script>
+</body>
+</html>

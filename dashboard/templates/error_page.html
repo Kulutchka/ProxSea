@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Block Page — ProxSea{% endblock %}
+{% block topbar_title %}Block Page{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Custom block page</h1>
+    <p class="page-desc">
+      This HTML is shown when a request is blocked and the matching list has no redirect URL set. Keep it self-contained — inline styles only, no external assets — since blocked users can't load anything else through the proxy.
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Available placeholders</h2>
+  </div>
+  <div class="card-body pad-0">
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%U</span><span class="text-muted">Requested URL</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%i</span><span class="text-muted">Client IP address</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%h</span><span class="text-muted">Proxy hostname</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%T</span><span class="text-muted">Time (UTC)</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%H</span><span class="text-muted">Request method</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%s</span><span class="text-muted">Squid version</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%w</span><span class="text-muted">Admin email (requires cache_mgr)</span></div>
+    <div class="entry-row"><span class="entry-type">code</span><span class="entry-value mono">%c</span><span class="text-muted">Error code</span></div>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('save_error_page') }}">
+  <div class="card">
+    <div class="card-head">
+      <h2 class="card-title">HTML source</h2>
+      <a href="{{ url_for('apply_preview') }}" class="btn btn-ghost btn-sm">Remember to apply after saving</a>
+    </div>
+    <div class="card-body pad-0">
+      <textarea name="html" rows="22" class="textarea" style="border: 0; border-radius: 0;">{{ current_html }}</textarea>
+    </div>
+    <div class="card-body" style="border-top: 1px solid var(--border);">
+      <button type="submit" class="btn btn-primary">Save block page</button>
+    </div>
+  </div>
+</form>
+
+{% endblock %}

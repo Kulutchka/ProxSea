@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}{{ lst['name'] }} — ProxSea{% endblock %}
+{% block topbar_title %}Lists &amp; Rules{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('dashboard_home') }}" class="text-sm text-muted" style="display: inline-flex; align-items: center; gap: 4px;">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+  </svg>
+  All lists
+</a>
+
+<div class="page-header" style="margin-top: 12px;">
+  <div>
+    <h1 class="page-title" style="display: flex; align-items: center; gap: 10px;">
+      {{ lst['name'] }}
+      {% if is_subscription %}
+        <span class="badge brand">subscription</span>
+      {% endif %}
+      {% if lst['enabled'] %}
+        <span class="badge success"><span class="dot"></span>Enabled</span>
+      {% else %}
+        <span class="badge neutral">Disabled</span>
+      {% endif %}
+    </h1>
+    {% if is_subscription %}
+      <p class="page-desc">This list is kept in sync from a remote source and re-downloaded automatically on its schedule.</p>
+    {% else %}
+      <p class="page-desc">Add block rules and allow exceptions. Rules here are merged into Squid's config when you apply.</p>
+    {% endif %}
+  </div>
+  <form method="POST" action="{{ url_for('toggle_list', list_id=lst['id']) }}">
+    <button type="submit" class="btn btn-secondary">
+      {{ 'Disable list' if lst['enabled'] else 'Enable list' }}
+    </button>
+  </form>
+</div>
+
+{% if is_subscription %}
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Subscription</h2>
+    <form method="POST" action="{{ url_for('refresh_subscription', list_id=lst['id']) }}">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Refresh now
+      </button>
+    </form>
+  </div>
+  <div class="card-body pad-0">
+    <div class="entry-row"><span class="entry-type">source</span><span class="entry-value">{{ lst['source_url'] }}</span></div>
+    <div class="entry-row">
+      <span class="entry-type">action</span>
+      <span class="entry-value">{{ 'Allow (whitelist)' if lst['subscription_action'] == 'allow' else 'Block (blacklist)' }}</span>
+    </div>
+    <div class="entry-row">
+      <span class="entry-type">type</span>
+      <span class="entry-value">
+        {% set t = lst['subscription_type'] or 'auto' %}
+        {{ {'auto': 'Auto-detect', 'domain': 'Domain', 'network': 'Network / IP', 'url': 'URL pattern (regex)'}[t] }}
+      </span>
+    </div>
+    <div class="entry-row"><span class="entry-type">updated</span><span class="entry-value">{{ lst['last_checked']|timeago }}</span></div>
+    {% if lst['last_error'] %}
+      <div class="entry-row"><span class="entry-type">status</span><span class="entry-value" style="color: var(--danger);">{{ lst['last_error'] }}</span></div>
+    {% endif %}
+    <form method="POST" action="{{ url_for('set_subscription_interval', list_id=lst['id']) }}" class="entry-row" style="gap: 14px;">
+      <span class="entry-type">interval</span>
+      <select class="select" name="interval" style="max-width: 220px;">
+        {% for secs, label in intervals %}
+          <option value="{{ secs }}" {{ 'selected' if lst['update_interval'] == secs }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Block-page redirect (optional)</h2>
+  </div>
+  <div class="card-body">
+    <p class="hint" style="margin-top: 0;">
+      If set, users blocked by a rule in this list are redirected here instead of seeing the default block page. Leave blank to use the standard page.
+    </p>
+    <form method="POST" action="{{ url_for('set_list_redirect', list_id=lst['id']) }}" class="form-row">
+      <input type="url" name="redirect_url" placeholder="https://example.com/blocked"
+             value="{{ lst['redirect_url'] or '' }}" class="input">
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+  </div>
+</div>
+
+{% if not is_subscription %}
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Add entries</h2>
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('create_entries') }}">
+      <input type="hidden" name="list_id" value="{{ lst['id'] }}">
+      <div class="form-grid">
+        <div class="field">
+          <label class="label">Type</label>
+          <select name="entry_type" class="select">
+            <option value="domain">Domain</option>
+            <option value="url">URL pattern (regex)</option>
+            <option value="network">Network / IP (CIDR)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Action</label>
+          <select name="action" class="select">
+            <option value="block">Block</option>
+            <option value="allow">Allow (exception)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Values</label>
+        <textarea name="values" rows="5" required class="textarea"
+                  placeholder="example.com&#10;.ads.example.com&#10;192.168.50.0/24"></textarea>
+        <p class="hint">One per line. <span class="mono">.example.com</span> matches subdomains too; networks use <span class="mono">10.0.0.0/24</span> or a single IP.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">Add entries</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Import entries from URL</h2>
+  </div>
+  <div class="card-body">
+    <p class="hint" style="margin-top: 0;">
+      Add entries from a remote text file into this list. Lines that are domains or IPs are auto-detected; comments and blank lines are skipped.
+    </p>
+    <form method="POST" action="{{ url_for('import_into_list', list_id=lst['id']) }}">
+      <div class="form-grid">
+        <div class="field">
+          <label class="label">Action</label>
+          <select class="select" name="action">
+            <option value="block">Block (blacklist)</option>
+            <option value="allow">Allow (whitelist)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Line type</label>
+          <select class="select" name="entry_type">
+            <option value="auto">Auto-detect</option>
+            <option value="domain">Domain</option>
+            <option value="network">Network / IP</option>
+            <option value="url">URL pattern (regex)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">URL</label>
+        <input class="input" type="url" name="url" required
+               placeholder="https://raw.githubusercontent.com/…/domains">
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Import
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Entries</h2>
+    <span class="text-sm text-muted">{{ entries|length }} entr{{ 'y' if entries|length == 1 else 'ies' }}</span>
+  </div>
+  <div class="card-body pad-0">
+    {% if entries|length == 0 %}
+      <div class="empty-state">
+        <div class="empty-title">No entries yet</div>
+        {% if is_subscription %}
+          <div class="empty-sub">The source list didn't produce any usable entries, or it hasn't been refreshed yet.</div>
+        {% else %}
+          <div class="empty-sub">Add your first domain, URL or network above.</div>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if is_subscription and entries|length > 0 %}
+      <div class="entry-row" style="color: var(--text-muted); font-size: 12.5px;">
+        Entries are managed by the subscription and will be overwritten on the next refresh.
+      </div>
+    {% endif %}
+    {% for e in entries %}
+      <div class="entry-row">
+        <span class="entry-type">{{ e['entry_type'] }}</span>
+        {% if e['action'] == 'block' %}
+          <span class="badge danger">block</span>
+        {% else %}
+          <span class="badge success">allow</span>
+        {% endif %}
+        <span class="entry-value">{{ e['value'] }}</span>
+        {% if not is_subscription %}
+        <form method="POST" action="{{ url_for('delete_entry', entry_id=e['id']) }}">
+          <button type="submit" class="btn-icon danger" title="Remove entry">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

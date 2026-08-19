@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Lists & Rules — ProxSea{% endblock %}
+{% block topbar_title %}Lists &amp; Rules{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Access lists</h1>
+    <p class="page-desc">Group domains, URL patterns and networks into lists. Enable or disable a whole list, or set a custom block page per list.</p>
+  </div>
+  <a href="{{ url_for('apply_preview') }}" class="btn btn-primary btn-lg">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+    </svg>
+    Review &amp; Apply
+  </a>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Lists</div>
+    <div class="stat-value">{{ totals['lists'] }} <span class="unit">total</span></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Subscriptions</div>
+    <div class="stat-value">{{ subscriptions|length }} <span class="unit">auto-refresh</span></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Domains blocked</div>
+    <div class="stat-value">{{ totals['domain_block'] }} <span class="unit">entries</span></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">URL patterns blocked</div>
+    <div class="stat-value">{{ totals['url_block'] }} <span class="unit">entries</span></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Networks blocked</div>
+    <div class="stat-value">{{ totals['network_block'] }} <span class="unit">entries</span></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Allow exceptions</div>
+    <div class="stat-value">{{ totals['allow'] }} <span class="unit">entries</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Default access policy</h2>
+    <span class="badge {{ 'success' if default_policy == 'allow' else 'warning' }}">
+      {{ 'Allow all (blacklist)' if default_policy == 'allow' else 'Deny all (whitelist)' }}
+    </span>
+  </div>
+  <div class="card-body">
+    <p class="hint" style="margin-top: 0; margin-bottom: 14px;">
+      Controls what happens to requests that don't match any rule in your lists.
+      <strong>Allow all</strong> blocks only what's on a blacklist; <strong>Deny all</strong> blocks everything except what's explicitly allowed.
+      Changes take effect after you Review &amp; Apply.
+    </p>
+    <form method="POST" action="{{ url_for('change_policy') }}" class="policy-toggle">
+      <button type="submit" name="policy" value="allow"
+              class="policy-option {{ 'active' if default_policy == 'allow' }}">Allow all</button>
+      <button type="submit" name="policy" value="deny"
+              class="policy-option {{ 'active' if default_policy == 'deny' }}">Deny all</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Subscribed lists</h2>
+    <span class="text-sm text-muted">{{ subscriptions|length }} subscription{{ 's' if subscriptions|length != 1 }}</span>
+  </div>
+  <div class="card-body pad-0">
+    {% if subscriptions|length == 0 %}
+      <div class="empty-state">
+        <div class="empty-title">No subscriptions yet</div>
+        <div class="empty-sub">Subscribe to a remote blocklist or allowlist below — it'll re-download automatically on its schedule.</div>
+      </div>
+    {% endif %}
+    {% for lst in subscriptions %}
+      {% set c = counts.get(lst['id'], {}) %}
+      <div class="row">
+        <div class="row-main">
+          <div class="row-title">
+            <a href="{{ url_for('list_detail', list_id=lst['id']) }}">{{ lst['name'] }}</a>
+            {% if lst['subscription_action'] == 'allow' %}
+              <span class="badge success">allow</span>
+            {% else %}
+              <span class="badge danger">block</span>
+            {% endif %}
+          </div>
+          <div class="row-sub truncate">{{ lst['source_url'] }}</div>
+          <div class="row-sub">
+            {{ c.get('domain_block', 0) + c.get('url_block', 0) + c.get('network_block', 0) + c.get('domain_allow', 0) + c.get('url_allow', 0) + c.get('network_allow', 0) }} entries
+            · updated {{ lst['last_checked']|timeago }}
+            · {{ lst['update_interval']|interval_label }}
+            {% if lst['last_error'] %} · <span class="text-muted" title="{{ lst['last_error'] }}">last sync failed</span>{% endif %}
+          </div>
+        </div>
+        <div class="row-actions">
+          {% if lst['enabled'] %}
+            <span class="badge success"><span class="dot"></span>Enabled</span>
+          {% else %}
+            <span class="badge neutral">Disabled</span>
+          {% endif %}
+          <form method="POST" action="{{ url_for('refresh_subscription', list_id=lst['id']) }}">
+            <button type="submit" class="btn btn-secondary btn-sm" title="Check for updates now">Refresh</button>
+          </form>
+          <form method="POST" action="{{ url_for('toggle_list', list_id=lst['id']) }}">
+            <button type="submit" class="btn btn-secondary btn-sm">
+              {{ 'Disable' if lst['enabled'] else 'Enable' }}
+            </button>
+          </form>
+          <form method="POST" action="{{ url_for('delete_list', list_id=lst['id']) }}"
+                onsubmit="return confirm('Unsubscribe from \'{{ lst['name'] }}\' and remove its entries?');">
+            <button type="submit" class="btn-icon danger" title="Unsubscribe">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Your lists</h2>
+    <span class="text-sm text-muted">{{ lists|length }} list{{ 's' if lists|length != 1 }}</span>
+  </div>
+  <div class="card-body pad-0">
+    {% if lists|length == 0 %}
+      <div class="empty-state">
+        <div class="empty-title">No lists yet</div>
+        <div class="empty-sub">Create your first list below to start filtering traffic.</div>
+      </div>
+    {% endif %}
+    {% for lst in lists %}
+      {% set c = counts.get(lst['id'], {}) %}
+      <div class="row">
+        <div class="row-main">
+          <div class="row-title">
+            <a href="{{ url_for('list_detail', list_id=lst['id']) }}">{{ lst['name'] }}</a>
+          </div>
+          <div class="row-sub">
+            {{ c.get('domain_block', 0) }} domains · {{ c.get('url_block', 0) }} URLs · {{ c.get('network_block', 0) }} networks
+            {% if c.get('allow', 0) %}<span class="text-muted"> · {{ c.get('allow', 0) }} allow</span>{% endif %}
+            {% if lst['redirect_url'] %} · <span class="text-muted">redirects to {{ lst['redirect_url'] }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="row-actions">
+          {% if lst['enabled'] %}
+            <span class="badge success"><span class="dot"></span>Enabled</span>
+          {% else %}
+            <span class="badge neutral">Disabled</span>
+          {% endif %}
+          <form method="POST" action="{{ url_for('toggle_list', list_id=lst['id']) }}">
+            <button type="submit" class="btn btn-secondary btn-sm">
+              {{ 'Disable' if lst['enabled'] else 'Enable' }}
+            </button>
+          </form>
+          {% if lst['name'] != 'Default' %}
+          <form method="POST" action="{{ url_for('delete_list', list_id=lst['id']) }}"
+                onsubmit="return confirm('Delete list \'{{ lst['name'] }}\' and all its entries?');">
+            <button type="submit" class="btn-icon danger" title="Delete list">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Create a new list</h2>
+  </div>
+  <div class="card-body">
+    <p class="hint" style="margin-top: 0;">
+      Use separate lists to organize rules — for example an imported ad-blocklist, a "kids devices" policy, or a one-off exception set.
+    </p>
+    <form method="POST" action="{{ url_for('create_list') }}" class="form-row">
+      <input type="text" name="name" placeholder="e.g. Malware Domains" required class="input">
+      <button type="submit" class="btn btn-primary">Create list</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Subscribe to a list</h2>
+  </div>
+  <div class="card-body">
+    <p class="hint" style="margin-top: 0;">
+      Add a remote whitelist or blacklist that stays in sync automatically. It's downloaded now and re-checked on the schedule below — if it changes, the proxy updates itself.
+      One domain or IP per line, comments and blank lines ignored; hosts-file lines like <span class="mono">0.0.0.0 example.com</span> are handled too.
+    </p>
+    <form method="POST" action="{{ url_for('create_subscription') }}">
+      <div class="form-grid">
+        <div class="field">
+          <label class="label">List name</label>
+          <input class="input" type="text" name="name"
+                 placeholder="Leave blank to derive from URL">
+        </div>
+        <div class="field">
+          <label class="label">Action</label>
+          <select class="select" name="action">
+            <option value="block">Block (blacklist)</option>
+            <option value="allow">Allow (whitelist)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label class="label">Line type</label>
+          <select class="select" name="entry_type">
+            <option value="auto">Auto-detect</option>
+            <option value="domain">Domain</option>
+            <option value="network">Network / IP</option>
+            <option value="url">URL pattern (regex)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Update interval</label>
+          <select class="select" name="interval">
+            {% for secs, label in intervals %}
+              <option value="{{ secs }}" {{ 'selected' if secs == 86400 }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">URL</label>
+        <input class="input" type="url" name="url" required
+               placeholder="https://raw.githubusercontent.com/…/domains">
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Subscribe
+      </button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

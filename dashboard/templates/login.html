@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Sign in — ProxSea{% endblock %}
+{% block auth_content %}
+<button type="button" class="theme-toggle theme-toggle-float" data-theme-toggle aria-label="Toggle color theme" title="Toggle light/dark">
+  <svg class="theme-ico theme-ico-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+  </svg>
+  <svg class="theme-ico theme-ico-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+</button>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-head">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      </div>
+      <h1 class="auth-title">ProxSea</h1>
+      <p class="auth-sub">Squid · ClamAV gateway administration</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="field">
+        <label class="label" for="password">Admin password</label>
+        <input class="input" type="password" id="password" name="password" autofocus required
+               placeholder="Enter your password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+        Sign in
+      </button>
+    </form>
+
+    <p style="text-align: center; margin: 20px 0 0;">
+      <a href="{{ url_for('setup_page') }}" style="color: var(--text-muted); font-size: 13px;">
+        Need to install the proxy certificate? Set up your device
+      </a>
+    </p>
+  </div>
+</div>
+{% endblock %}

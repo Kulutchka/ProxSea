@@ -1,0 +1,98 @@
+services:
+  ssl-proxy:
+    build: .
+    container_name: proxsea-proxy
+    restart: unless-stopped
+    environment:
+      # Set a real password — do not leave this as-is.
+      - ROOT_PASSWORD=changeme
+      # Optional: paste a public key instead of/alongside a password
+      # - SSH_AUTHORIZED_KEY=ssh-ed25519 AAAA... you@yourhost
+    ports:
+      - "2222:22"      # SSH (mapped to a non-standard host port)
+      - "3128:3128"    # explicit proxy (HTTP + SSL-bumped HTTPS via CONNECT)
+      - "3129:3129"    # transparent HTTP intercept
+      - "3130:3130"    # transparent HTTPS intercept (SSL bump)
+    extra_hosts:
+      # Lets the container reach services running on your host machine
+      # via host.docker.internal — useful for testing against a local
+      # webserver, and works the same way on Linux/Mac/Windows Docker.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Persist the CA cert + key across container recreation — losing
+      # this means every client needs the new CA re-installed.
+      - ssl_cert_data:/etc/squid/ssl_cert
+      # NOTE: ssl_db (the signed-cert cache) is intentionally NOT
+      # persisted on a volume. It's just a cache of already-issued
+      # fake leaf certificates for SSL-bumped sites — losing it on
+      # restart only costs a brief cache warm-up, nothing functional.
+      # security_file_certgen -c insists on creating this directory
+      # itself and fails with a generic "Cannot create" error if the
+      # path already exists (confirmed via strace: internal mkdir()
+      # call fails with EEXIST) — keeping it off a named volume avoids
+      # ever hitting that state.
+      # Persist virus signatures so you're not re-downloading ~110MB on
+      # every container restart
+      - clamav_data:/var/lib/clamav
+      # Shared with the dashboard service: the dashboard writes
+      # rules.conf + list files + custom error templates here, and
+      # this container's config-watcher process reloads Squid whenever
+      # the dashboard signals a change.
+      - squid_managed_config:/etc/squid/managed
+      # Squid's access.log + cache.log — shared read-only with the
+      # dashboard so it can display a live log view.
+      - squid_logs:/var/log/squid
+    # Only needed if THIS container will apply iptables rules to
+    # intercept other hosts' traffic (i.e. it's acting as a gateway).
+    # Omit cap_add and network_mode if you're only using explicit-proxy
+    # mode (clients configured with proxy settings pointed at :3128).
+    cap_add:
+      - NET_ADMIN
+    # network_mode: host   # uncomment if doing real transparent interception
+
+  dashboard:
+    build: ./dashboard
+    container_name: proxsea-dashboard
+    restart: unless-stopped
+    environment:
+      # Only used to set the initial admin password on first run — after
+      # that the hash lives in the SQLite DB and this var is ignored.
+      # Change the password from the dashboard itself after first login.
+      - DASHBOARD_PASSWORD=changeme
+      # Optional: pin this so login sessions survive a container
+      # restart. If unset, a random key is generated at each startup,
+      # which logs everyone out whenever the dashboard container
+      # restarts (harmless, just mildly annoying).
+      # - DASHBOARD_SECRET_KEY=some-long-random-string
+      # The proxy address shown on the public Client Setup page. Set
+      # PROXY_HOST to your server's LAN IP or hostname so the browser
+      # instructions are copy-paste ready (leave blank to show a
+      # placeholder).
+      # - PROXY_HOST=192.168.1.10
+      # - PROXY_PORT=3128
+    ports:
+      - "8080:5000"    # dashboard web UI
+    volumes:
+      # Same shared volume as ssl-proxy — this is how the dashboard's
+      # generated config actually reaches Squid.
+      - squid_managed_config:/etc/squid/managed
+      # The dashboard's own rule database (lists, entries, settings,
+      # password hash) — separate from Squid's config volume so rule
+      # data survives independently.
+      - dashboard_data:/data
+      # Read-only view of Squid's logs (see ssl-proxy service).
+      - squid_logs:/var/log/squid:ro
+      # The CA certificate (read-only) so the public "client setup" page
+      # can offer the squidCA.der download to end users.
+      - ssl_cert_data:/etc/squid/ssl_cert:ro
+      # One-URL-per-line file: these become block subscriptions on first run.
+      - ./blacklists.txt:/app/blacklists.txt:ro
+    depends_on:
+      - ssl-proxy
+
+volumes:
+  ssl_cert_data:
+  clamav_data:
+  squid_managed_config:
+  dashboard_data:
+  squid_logs:

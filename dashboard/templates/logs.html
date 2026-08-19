@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Logs — ProxSea{% endblock %}
+{% block topbar_title %}Logs{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Log monitor</h1>
+    <p class="page-desc">Live tail of Squid's access and cache logs. Updates automatically; use search to filter and pause to freeze the view.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div class="tabs" role="tablist">
+      {% for key, (label, _) in log_files.items() %}
+      <button class="tab {{ 'active' if key == 'access' }}" data-file="{{ key }}" role="tab">{{ label }}</button>
+      {% endfor %}
+    </div>
+    <div class="log-controls">
+      <input class="input log-search" type="search" placeholder="Filter lines…" autocomplete="off">
+      <button class="btn btn-secondary btn-sm log-pause" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+        </svg>
+        Pause
+      </button>
+    </div>
+  </div>
+  <div class="log-status">
+    <span class="log-meta" id="log-meta">Loading…</span>
+    <span class="log-meta text-muted" id="log-updated"></span>
+  </div>
+  <div class="log-body">
+    <pre class="log-output" id="log-output">Loading…</pre>
+  </div>
+</div>
+
+<style>
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .tab:hover { background: var(--surface-2); color: var(--text); }
+  .tab.active { background: var(--brand-soft); color: var(--brand); }
+
+  .log-controls { display: flex; align-items: center; gap: 8px; }
+  .log-search { width: 220px; padding: 6px 10px; }
+
+  .log-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .log-meta { font-size: 12px; color: var(--text-muted); }
+
+  .log-body {
+    max-height: 62vh;
+    overflow: auto;
+    background: #0b1220;
+  }
+  .log-output {
+    margin: 0;
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.55;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .log-output .log-line { display: block; }
+  .log-output .log-line.denied { background: rgba(220, 38, 38, 0.16); color: #fca5a5; }
+  .log-output .log-line.warn   { background: rgba(217, 119, 6, 0.14); color: #fcd34d; }
+  .log-output .log-line.ok     { color: #86efac; }
+  .log-output .log-line.dim    { color: #64748b; }
+</style>
+
+<script>
+(function () {
+  var state = {
+    file: 'access',
+    paused: false,
+    filter: '',
+    lines: [],
+    size: 0,
+    timer: null,
+  };
+
+  var tabs = document.querySelectorAll('.tab');
+  var output = document.getElementById('log-output');
+  var meta = document.getElementById('log-meta');
+  var updated = document.getElementById('log-updated');
+  var search = document.querySelector('.log-search');
+  var pauseBtn = document.querySelector('.log-pause');
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function classify(line) {
+    if (/DENIED/.test(line)) return 'denied';
+    if (/\b(ERROR|WARNING|FATAL|CRITICAL)\b/.test(line)) return 'warn';
+    if (/\b(TCP_MISS|TCP_HIT|TCP_REFRESH|NONE_NONE\/2\d\d)/.test(line)) return 'ok';
+    return '';
+  }
+
+  function isPinned() {
+    return output.scrollHeight - output.scrollTop - output.clientHeight < 40;
+  }
+
+  function render() {
+    var q = state.filter.trim().toLowerCase();
+    var html = '';
+    var shown = 0;
+    for (var i = 0; i < state.lines.length; i++) {
+      var line = state.lines[i];
+      if (q && line.toLowerCase().indexOf(q) === -1) continue;
+      var cls = classify(line);
+      html += '<span class="log-line' + (cls ? ' ' + cls : '') + '">' + esc(line) + '\n</span>';
+      shown++;
+    }
+    if (!shown) {
+      html = '<span class="log-line dim">— no matching lines —</span>';
+    }
+    output.innerHTML = html;
+    if (isPinned()) {
+      output.scrollTop = output.scrollHeight;
+    }
+    return shown;
+  }
+
+  function humanSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function fetchLog() {
+    fetch('/logs/data/' + state.file, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        state.lines = data.lines || [];
+        state.size = data.size || 0;
+        var shown = render();
+        meta.textContent = state.lines.length + ' lines · ' + humanSize(state.size);
+        updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        if (state.filter) {
+          meta.textContent = shown + ' of ' + state.lines.length + ' lines · ' + humanSize(state.size);
+        }
+      })
+      .catch(function () {
+        output.innerHTML = '<span class="log-line warn">Could not load log file — is the ssl-proxy container running?</span>';
+      })
+      .finally(function () {
+        if (!state.paused) {
+          state.timer = setTimeout(fetchLog, 3000);
+        }
+      });
+  }
+
+  function switchFile(file) {
+    state.file = file;
+    tabs.forEach(function (t) {
+      t.classList.toggle('active', t.getAttribute('data-file') === file);
+    });
+    clearTimeout(state.timer);
+    output.innerHTML = 'Loading…';
+    meta.textContent = 'Loading…';
+    updated.textContent = '';
+    fetchLog();
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      switchFile(t.getAttribute('data-file'));
+    });
+  });
+
+  search.addEventListener('input', function () {
+    state.filter = search.value;
+    render();
+  });
+
+  pauseBtn.addEventListener('click', function () {
+    state.paused = !state.paused;
+    if (state.paused) {
+      clearTimeout(state.timer);
+      pauseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Resume';
+      pauseBtn.classList.add('btn-success');
+      pauseBtn.classList.remove('btn-secondary');
+      updated.textContent = 'Paused';
+    } else {
+      pauseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause';
+      pauseBtn.classList.remove('btn-success');
+      pauseBtn.classList.add('btn-secondary');
+      updated.textContent = '';
+      fetchLog();
+    }
+  });
+
+  fetchLog();
+})();
+</script>
+
+{% endblock %}

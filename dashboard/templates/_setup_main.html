@@ -1,0 +1,290 @@
+<div class="hero">
+  <h1>Set up your device</h1>
+  <p>
+    This proxy inspects HTTPS traffic to apply content filtering and antivirus scanning.
+    Install its certificate as trusted, then point your browser at the proxy.
+  </p>
+</div>
+
+<div class="download-card">
+  <div class="dl-ico">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  </div>
+  <div class="dl-text">
+    <div class="dl-title">Proxy CA certificate</div>
+    <div class="dl-sub">squidCA.der — the trust anchor for SSL inspection</div>
+  </div>
+  {% if cert_ready %}
+    <a href="{{ url_for('setup_download') }}" class="btn btn-primary">Download certificate</a>
+  {% else %}
+    <span class="btn btn-secondary" disabled>Not available yet</span>
+  {% endif %}
+</div>
+
+{% if not cert_ready %}
+<div class="note">
+  The certificate hasn't been generated yet. It is created automatically the first time
+  the proxy starts — try again in a few moments.
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="windows">Windows</button>
+    <button class="tab" data-tab="macos">macOS</button>
+    <button class="tab" data-tab="linux">Linux</button>
+  </div>
+
+  <div class="card-body">
+    <!-- Windows -->
+    <div class="tab-panel active" data-panel="windows">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Download the certificate</div>
+          <div class="step-desc">Use the Download button above and save <span class="mono">squidCA.der</span>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Open the certificate</div>
+          <div class="step-desc">Double-click <span class="mono">squidCA.der</span> and click <b>Install Certificate…</b>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Choose the store</div>
+          <div class="step-desc">
+            Select <b>Local Machine</b> → <b>Place all certificates in the following store</b> →
+            Browse → <b>Trusted Root Certification Authorities</b> → OK → Next → Finish.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Confirm</div>
+          <div class="step-desc">Approve the security prompt to complete the import.</div>
+        </div>
+      </div>
+      <div class="note"><b>Alternative (admin command line):</b>
+        <pre class="code">certutil -addstore -f "Root" "%USERPROFILE%\Downloads\squidCA.der"</pre>
+      </div>
+    </div>
+
+    <!-- macOS -->
+    <div class="tab-panel" data-panel="macos">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Download the certificate</div>
+          <div class="step-desc">Use the Download button above and save <span class="mono">squidCA.der</span>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Open in Keychain Access</div>
+          <div class="step-desc">Double-click <span class="mono">squidCA.der</span> to import it (into the login keychain).</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Trust it</div>
+          <div class="step-desc">
+            In Keychain Access, find <b>Squid SSL Inspection CA</b>, double-click it, expand
+            <b>Trust</b>, and set <b>“When using this certificate”</b> to <b>Always Trust</b>.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Save</div>
+          <div class="step-desc">Close the window and enter your login password when prompted.</div>
+        </div>
+      </div>
+      <div class="note"><b>Alternative (admin command line):</b>
+        <pre class="code">sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/Downloads/squidCA.der</pre>
+      </div>
+    </div>
+
+    <!-- Linux -->
+    <div class="tab-panel" data-panel="linux">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Download the certificate</div>
+          <div class="step-desc">Use the Download button above and save <span class="mono">squidCA.der</span>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Debian / Ubuntu</div>
+          <div class="step-desc">Copy it into the CA directory (note the <span class="mono">.crt</span> extension) and update the store:</div>
+          <pre class="code">sudo cp squidCA.der /usr/local/share/ca-certificates/squidCA.crt
+sudo update-ca-certificates</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Fedora / RHEL / CentOS</div>
+          <div class="step-desc">Copy it into the trust anchors and update:</div>
+          <pre class="code">sudo cp squidCA.der /etc/pki/ca-trust/source/anchors/
+sudo update-ca-trust</pre>
+        </div>
+      </div>
+      <div class="note">
+        <b>Firefox note:</b> on Linux, Firefox uses its own certificate store and ignores the system store.
+        Import it in Firefox via <b>Settings → Privacy &amp; Security → Certificates → View Certificates →
+        Authorities → Import</b>, then check <b>“Trust this CA to identify websites”</b>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Configure your browser to use the proxy</h2>
+    <span class="text-sm text-muted">Proxy: <span class="mono">{{ proxy_addr }}</span></span>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="firefox">Firefox</button>
+    <button class="tab" data-tab="chrome">Chrome</button>
+    <button class="tab" data-tab="safari">Safari</button>
+  </div>
+
+  <div class="card-body">
+    <!-- Firefox -->
+    <div class="tab-panel active" data-panel="firefox">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Open network settings</div>
+          <div class="step-desc">Open the menu (☰) → <b>Settings</b> → <b>General</b> → scroll to <b>Network Settings</b> → click <b>Settings…</b>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Choose manual proxy configuration</div>
+          <div class="step-desc">Select <b>Manual proxy configuration</b>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Enter the proxy</div>
+          <div class="step-desc">
+            Set <b>HTTP Proxy</b> to <span class="mono">{{ proxy_host }}</span> and <b>Port</b> to
+            <span class="mono">{{ proxy_port }}</span>, then check <b>“Also use this proxy for HTTPS”</b>.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Save</div>
+          <div class="step-desc">Click <b>OK</b> and try browsing — the first HTTPS visit should show no warning once the certificate is trusted.</div>
+        </div>
+      </div>
+      <div class="note">
+        Firefox trusts the system certificate store on Windows and macOS, so installing the CA
+        above is enough there. On Linux, import the CA into Firefox's own store as described in
+        the Linux certificate tab.
+      </div>
+    </div>
+
+    <!-- Chrome -->
+    <div class="tab-panel" data-panel="chrome">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Use your system proxy settings</div>
+          <div class="step-desc">
+            Chrome has no proxy settings of its own — it follows the operating system.
+            Configure the proxy once at the OS level and Chrome will use it automatically.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Windows</div>
+          <div class="step-desc">
+            <b>Settings → Network &amp; Internet → Proxy → Manual proxy setup</b> → turn on
+            <b>Use a proxy server</b> → address <span class="mono">{{ proxy_host }}</span>, port
+            <span class="mono">{{ proxy_port }}</span> → Save.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">macOS</div>
+          <div class="step-desc">
+            <b>System Settings → Network → select your connection → Details → Proxies</b> → enable
+            <b>Web Proxy (HTTP)</b> and <b>Secure Web Proxy (HTTPS)</b> with server
+            <span class="mono">{{ proxy_host }}</span> and port <span class="mono">{{ proxy_port }}</span>.
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>Launch-time alternative:</b> start Chrome with the proxy flag:
+        <pre class="code">google-chrome --proxy-server="{{ proxy_url }}"</pre>
+      </div>
+    </div>
+
+    <!-- Safari -->
+    <div class="tab-panel" data-panel="safari">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Open proxy settings</div>
+          <div class="step-desc">
+            Safari uses the macOS system proxy settings. Open <b>System Settings → Network</b>.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Select your connection</div>
+          <div class="step-desc">Choose your active network (Wi‑Fi or Ethernet) and click <b>Details…</b>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Enable the proxies</div>
+          <div class="step-desc">
+            Go to the <b>Proxies</b> tab and enable <b>Web Proxy (HTTP)</b> and
+            <b>Secure Web Proxy (HTTPS)</b>.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Enter the server</div>
+          <div class="step-desc">
+            For both, set the server to <span class="mono">{{ proxy_host }}</span> and port to
+            <span class="mono">{{ proxy_port }}</span>, then click <b>OK</b> and <b>Apply</b>.
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        Safari trusts the system certificate store, so once the CA is trusted in Keychain Access
+        (see the macOS certificate tab) no warnings should appear.
+      </div>
+    </div>
+  </div>
+</div>
