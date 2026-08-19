@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/proxsea_logo.jpeg" alt="ProxSea logo" width="280">
+  <img src="images/proxsea_logo.jpeg" alt="ProxSea logo" width="100%">
 </p>
 
 # ProxSea
