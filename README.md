@@ -47,15 +47,15 @@ It bundles three things that normally have to be wired together by hand:
  (browsers)  :3129/3130 │      │                     (clamd)       │
                         │      └── access rules from managed/      │
                         │          rules.conf                      │
-                        └──────────────────┬───────────────────────┘
-                                           │ shared volume
-                                           │ (squid_managed_config, squid_logs, ssl_cert_data)
-                        ┌──────────────────▼─────────────────────────┐
-                        │             proxsea-dashboard              │
-                        │   (Flask + SQLite + gunicorn, :5000→8080)  │
-                        │   writes rules.conf, lists, error pages    │
-                        │   reads logs, serves /setup CA download    │
-                        └────────────────────────────────────────────┘
+                        └──────────────┬───────────────────────────┘
+                                       │ shared volume
+                                       │ (squid_managed_config, squid_logs, ssl_cert_data)
+                        ┌──────────────▼───────────────────────────┐
+                        │             proxsea-dashboard            │
+                        │   (Flask + SQLite + gunicorn, :5000→8080) │
+                        │   writes rules.conf, lists, error pages  │
+                        │   reads logs, serves /setup CA download  │
+                        └──────────────────────────────────────────┘
 ```
 
 The two containers communicate through Docker named volumes:
@@ -65,7 +65,7 @@ The two containers communicate through Docker named volumes:
 | `squid_managed_config` | Dashboard writes `rules.conf`, list files, and custom error/virus pages; the proxy's config-watcher reloads Squid on change. |
 | `squid_logs` | Squid's `access.log` and `cache.log`, read by the dashboard's log viewer. |
 | `ssl_cert_data` | The generated CA certificate/key. Persisted so clients stay trusted across restarts. |
-| `clamav_data` | ClamAV virus signatures (avoids re-downloading on every restart). |
+| `clamav_data` | ClamAV virus signatures (avoids re-downloading ~110 MB on every restart). |
 | `dashboard_data` | The dashboard's own SQLite database (lists, entries, settings, password hash). |
 
 ---
@@ -74,9 +74,21 @@ The two containers communicate through Docker named volumes:
 
 - **Docker** (Engine + Compose v2). `docker compose` must work on your host.
 - ~**2 GB RAM** recommended (ClamAV signature loading is the biggest consumer).
-- ~**1 GB disk** for the images, plus space for ClamAV signatures (~100–300 MB depending on version) and Squid's SSL cache.
+- ~**1 GB disk** for the images, plus space for ClamAV signatures (~300 MB) and Squid's SSL cache.
 
-> **Note:** the exact ClamAV signature footprint varies by release — confirm the current figure before publishing if this matters to your readers.
+### Raspberry Pi (ARM / SD card)
+
+ProxSea is fully ARM-compatible — both images build and run on `arm64` with no changes. Use a **64-bit OS** (Raspberry Pi OS 64-bit or Ubuntu Server for arm64); Ubuntu 24.04 no longer ships 32-bit `armhf`, so a 32-bit OS or Pi 1/Zero won't work.
+
+The real constraint on a Pi is **RAM and SD-card wear**, not CPU:
+
+- **RAM** — ClamAV loads ~300–500 MB of signatures into memory. Use a **Pi 4/5 with 4 GB+**; a 1 GB model will likely OOM once `clamd` finishes loading.
+- **SD-card wear** — the project already routes the write-heavy paths to RAM for you:
+  - Squid's **disk cache is disabled** (`cache_dir` is not configured), since SSL-bumped HTTPS is largely uncacheable anyway.
+  - Squid's **logs** live on a `tmpfs`-backed shared volume (still visible in the dashboard's live log viewer, but never written to the SD card).
+  - The SSL certificate cache (`/var/lib/squid/ssl_db`) and Squid's spool directory are mounted as `tmpfs`.
+
+For the best experience, boot from a USB SSD and, if possible, move Docker's data root and the `clamav_data` volume there too. The ClamAV signature volume is the one thing kept on persistent storage (re-downloading ~300 MB on every boot is worse than the occasional write `freshclam` makes).
 
 ---
 
@@ -91,21 +103,17 @@ cd proxsea
 
 (Or copy the project directory to your server.)
 
-### 2. Set your passwords
+### 2. Set your password
 
-Edit `docker-compose.yml` and change **both** default passwords before first start:
+Edit `docker-compose.yml` and change the dashboard password before first start:
 
 ```yaml
-  ssl-proxy:
-    environment:
-      - ROOT_PASSWORD=change-me-ssh   # SSH into the proxy container
-
   dashboard:
     environment:
       - DASHBOARD_PASSWORD=change-me-dashboard   # initial dashboard login
 ```
 
-> `ROOT_PASSWORD` is optional — if you omit it, only SSH key auth works (see below). `DASHBOARD_PASSWORD` sets the *initial* admin password only; after first login you can change it from the dashboard.
+> `DASHBOARD_PASSWORD` sets the *initial* admin password only; after first login you can change it from the dashboard.
 
 Optional, but recommended:
 
@@ -194,7 +202,6 @@ Then configure clients to use the proxy:
 | `3129` | Squid transparent HTTP intercept | |
 | `3130` | Squid transparent HTTPS intercept | SSL bump |
 | `8080` | Dashboard web UI | maps to `:5000` in the container |
-| `2222` | SSH into the proxy container | `root` / `ROOT_PASSWORD` |
 | `1344` | c-icap (ICAP) | internal; not published by default |
 
 ---
@@ -222,8 +229,6 @@ docker compose down -v
 
 | Variable | Service | Default | Description |
 | --- | --- | --- | --- |
-| `ROOT_PASSWORD` | proxy | *(unset)* | Root password for SSH into the proxy container. |
-| `SSH_AUTHORIZED_KEY` | proxy | *(unset)* | Public key added to root's `authorized_keys`. |
 | `DASHBOARD_PASSWORD` | dashboard | `changeme` | Initial admin password (first run only). |
 | `DASHBOARD_SECRET_KEY` | dashboard | *(random)* | Session secret; pin it to persist logins across restarts. |
 | `PROXY_HOST` | dashboard | *(blank)* | Proxy hostname/IP shown on the Client Setup page. |

@@ -11,27 +11,7 @@ SSL_DB="/var/lib/squid/ssl_db"
 CERTGEN_BIN="/usr/lib/squid/security_file_certgen"
 
 # ---------------------------------------------------------------------------
-# 1. Root password for SSH — set via env var, never baked into the image.
-#    If ROOT_PASSWORD isn't provided, SSH key auth is still expected to
-#    work if you've mounted authorized_keys; password login just won't.
-# ---------------------------------------------------------------------------
-if [ -n "${ROOT_PASSWORD:-}" ]; then
-  echo "root:${ROOT_PASSWORD}" | chpasswd
-  echo "[entrypoint] Root password set from ROOT_PASSWORD env var."
-else
-  echo "[entrypoint] WARNING: ROOT_PASSWORD not set — root SSH password login will fail until you set one."
-fi
-
-if [ -n "${SSH_AUTHORIZED_KEY:-}" ]; then
-  mkdir -p /root/.ssh
-  echo "${SSH_AUTHORIZED_KEY}" >> /root/.ssh/authorized_keys
-  chmod 700 /root/.ssh
-  chmod 600 /root/.ssh/authorized_keys
-  echo "[entrypoint] SSH public key installed from SSH_AUTHORIZED_KEY env var."
-fi
-
-# ---------------------------------------------------------------------------
-# 2. CA cert — generate once, persist on the mounted volume from then on
+# 1. CA cert — generate once, persist on the mounted volume from then on
 # ---------------------------------------------------------------------------
 mkdir -p "$CA_DIR"
 if [ ! -f "$CA_DIR/squidCA.pem" ]; then
@@ -47,7 +27,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. SSL cert database
+# 2. SSL cert database
 # ---------------------------------------------------------------------------
 mkdir -p /var/lib/squid
 chown proxy:proxy /var/lib/squid
@@ -75,7 +55,7 @@ fi
 chown -R proxy:proxy "$SSL_DB"
 
 # ---------------------------------------------------------------------------
-# 3b. Managed config (dashboard-owned) — Squid's config Includes
+# 3. Managed config (dashboard-owned) — Squid's config Includes
 #    /etc/squid/managed/rules.conf, so that file must exist before Squid's
 #    first parse or startup fails outright. Squid's error_directory also
 #    now points into this same volume, which means ALL standard error
@@ -161,7 +141,7 @@ BLOCK_HTML
 fi
 
 # ---------------------------------------------------------------------------
-# 3c. c-icap virus-blocked page — c-icap's VIRUS_FOUND template is a
+# 4. c-icap virus-blocked page — c-icap's VIRUS_FOUND template is a
 #    symlink into this volume (see Dockerfile), so it must exist before
 #    c-icap starts or the "virus found" page renders blank. Seeded once,
 #    on first boot only; the dashboard subsequently owns this file and
@@ -216,7 +196,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Runtime directories under /run — these are tmpfs and get wiped on
+# 5. Runtime directories under /run — these are tmpfs and get wiped on
 #    every container start, so they must be (re)created here rather than
 #    at build time. Normally the Debian init scripts (service X start)
 #    create these automatically; since supervisord launches the daemons
@@ -236,16 +216,8 @@ fi
 mkdir -p /var/log/squid
 chown proxy:proxy /var/log/squid
 
-# Squid's disk cache directories need one-time initialization the first
-# time they're used (normally done by the package postinst on a fresh
-# install, but worth confirming here in case the volume/layer is empty).
-if [ ! -d /var/spool/squid/00 ]; then
-  echo "[entrypoint] Initializing Squid cache directories."
-  squid -N -z || true
-fi
-
 # ---------------------------------------------------------------------------
-# 5. ClamAV signatures — only fetch on first boot if the volume is empty;
+# 6. ClamAV signatures — only fetch on first boot if the volume is empty;
 #    afterwards the freshclam daemon (managed by supervisord) keeps them
 #    updated in the background.
 # ---------------------------------------------------------------------------
@@ -257,7 +229,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Hand off to supervisord, which manages sshd / clamd / freshclam /
+# 7. Hand off to supervisord, which manages clamd / freshclam /
 #    c-icap / squid as long-running sibling processes and restarts any
 #    that crash — this replaces the `service X start` + manual PID
 #    cleanup dance from the interactive session.

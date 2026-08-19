@@ -3,13 +3,7 @@ services:
     build: .
     container_name: proxsea-proxy
     restart: unless-stopped
-    environment:
-      # Set a real password — do not leave this as-is.
-      - ROOT_PASSWORD=changeme
-      # Optional: paste a public key instead of/alongside a password
-      # - SSH_AUTHORIZED_KEY=ssh-ed25519 AAAA... you@yourhost
     ports:
-      - "2222:22"      # SSH (mapped to a non-standard host port)
       - "3128:3128"    # explicit proxy (HTTP + SSL-bumped HTTPS via CONNECT)
       - "3129:3129"    # transparent HTTP intercept
       - "3130:3130"    # transparent HTTPS intercept (SSL bump)
@@ -40,8 +34,17 @@ services:
       # the dashboard signals a change.
       - squid_managed_config:/etc/squid/managed
       # Squid's access.log + cache.log — shared read-only with the
-      # dashboard so it can display a live log view.
+      # dashboard so it can display a live log view. Backed by tmpfs
+      # (RAM, see the squid_logs volume definition) so logs never touch
+      # the SD card; they are intentionally not persisted across reboots.
       - squid_logs:/var/log/squid
+    # Ephemeral, write-heavy paths kept in RAM instead of the container
+    # layer / SD card. ssl_db only holds transient signed-cert caches and
+    # is rebuilt on boot; the spool dir is unused now that cache_dir is
+    # disabled but kept off-disk as a belt-and-suspenders measure.
+    tmpfs:
+      - /var/lib/squid:size=64m
+      - /var/spool/squid:size=32m
     # Only needed if THIS container will apply iptables rules to
     # intercept other hosts' traffic (i.e. it's acting as a gateway).
     # Omit cap_add and network_mode if you're only using explicit-proxy
@@ -95,4 +98,14 @@ volumes:
   clamav_data:
   squid_managed_config:
   dashboard_data:
+  # Squid's logs are kept in RAM (tmpfs) instead of on disk — they're only
+  # needed for the live log viewer, not across reboots. This avoids the
+  # constant access.log/cache.log writes wearing out an SD card on a Pi.
+  # The dashboard still reads the same shared volume, so nothing changes
+  # functionally; the contents simply don't survive a Docker daemon restart.
   squid_logs:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=128m"
