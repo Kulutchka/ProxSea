@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         openssl \
         iproute2 iptables \
         ca-certificates \
+        python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
@@ -62,6 +63,15 @@ adaptation_access avscan2 allow all
 # the dashboard when a custom error page is saved.
 error_directory /etc/squid/managed/errors/en
 EOF
+
+# Fail the build if the config injection above didn't take — this catches the
+# "Adaptation support is off / No ssl_bump configured / Starting 5/32" symptom
+# (a stale cached layer from an older Dockerfile) at build time instead of at
+# runtime on the device.
+RUN grep -q "^http_port 3128 .*ssl-bump" /etc/squid/squid.conf \
+    && grep -q "^icap_enable on" /etc/squid/squid.conf \
+    && grep -q "^ssl_bump bump all" /etc/squid/squid.conf \
+    || { echo "ERROR: squid.conf is missing the ProxSea config block — rebuild with: docker compose build --no-cache" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
 # 3. c-icap: wire in the real virus_scan service (do NOT hand-add a

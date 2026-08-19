@@ -221,6 +221,14 @@ fi
 # open its own log files after the volume is first mounted.
 mkdir -p /var/log/squid
 chown proxy:proxy /var/log/squid
+# Pre-create the log files owned by proxy. cache.log is otherwise created by
+# the `tee` in supervisord's squid command, which runs as root and makes the
+# file root-owned 0644 — then Squid (as proxy) can't write it during
+# `squid -k reconfigure`, surfacing as "Cannot open cache_log ... Permission
+# denied". Creating them here (proxy-owned) means the root tee only ever
+# appends to a file that stays proxy-owned.
+touch /var/log/squid/access.log /var/log/squid/cache.log
+chown proxy:proxy /var/log/squid/access.log /var/log/squid/cache.log
 
 # ---------------------------------------------------------------------------
 # 6. ClamAV signatures — only fetch on first boot if the volume is empty;
