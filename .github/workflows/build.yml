@@ -1,0 +1,83 @@
+name: Build and push containers
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+# Needed so the default GITHUB_TOKEN can push images to GHCR.
+permissions:
+  contents: read
+  packages: write
+
+# Cancel superseded runs on the same ref so we don't waste build minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.image.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          # GHCR image names must be lowercase; update these if the repo moves.
+          - name: proxsea-proxy
+            context: .
+            file: Dockerfile
+          - name: proxsea-dashboard
+            context: ./dashboard
+            file: dashboard/Dockerfile
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # QEMU lets buildx emulate arm64 so we can produce multi-arch images
+      # (the project targets Raspberry Pi / arm64 in addition to x86_64).
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Log in to GHCR using the built-in token. To publish to Docker Hub
+      # instead, swap this block for:
+      #   registry: docker.io
+      #   username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #   password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # (and change the `images:` value in the metadata step below).
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Derive tags + OCI labels from git metadata.
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/kulutchka/${{ matrix.image.name }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.file }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}

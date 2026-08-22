@@ -16,6 +16,21 @@ It bundles three things that normally have to be wired together by hand:
 
 ---
 
+## QUICK START
+
+Admin Password: changeme
+
+!!! Do not forget to change your password !!!
+
+```bash
+git clone https://github.com/Kulutchka/ProxSea
+cd ProxSea
+cp .env.example .env 
+docker compose -f docker-compose.prod.yml up -d
+```
+
+
+
 ## Features
 
 - **Explicit proxy** on port `3128` with SSL inspection of HTTPS (`CONNECT`) traffic.
@@ -159,6 +174,37 @@ docker compose logs -f
 ### 5. Log in to the dashboard
 
 Open **http://your-server-ip:8080** and log in with the `DASHBOARD_PASSWORD` you set (default `changeme` — change it).
+
+---
+
+## Production deployment (prebuilt images)
+
+Instead of building locally, you can run ProxSea from the prebuilt images published to GitHub Container Registry (GHCR) by the [`build`](.github/workflows/build.yml) workflow.
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`docker-compose.prod.yml` is identical to `docker-compose.yml` except that each service pulls a GHCR image instead of a build context:
+
+| Service | Image |
+| --- | --- |
+| `ssl-proxy` | `ghcr.io/kulutchka/proxsea-proxy` |
+| `dashboard` | `ghcr.io/kulutchka/proxsea-dashboard` |
+
+By default it tracks `latest` (the `main` branch). Pin a release tag with the `PROXSEA_VERSION` variable:
+
+```bash
+PROXSEA_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml up -d
+```
+
+or in a `.env` file next to the compose file:
+
+```text
+PROXSEA_VERSION=v1.0.0
+```
+
+The workflow tags images with `latest` (main only), the branch name, the version tag (`v*`), and the commit SHA — so you can pin to any of those.
 
 ---
 

@@ -1,6 +1,17 @@
+# Production compose file — runs ProxSea from the prebuilt GHCR images
+# instead of building locally. No Dockerfile or build context is needed.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Pin a specific version by setting PROXSEA_VERSION, e.g.:
+#   PROXSEA_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml up -d
+# or put `PROXSEA_VERSION=v1.0.0` in a `.env` file next to this one.
+# Defaults to `latest` (tracking the main branch).
+
 services:
   ssl-proxy:
-    build: .
+    image: ghcr.io/kulutchka/proxsea-proxy:${PROXSEA_VERSION:-latest}
     container_name: proxsea-proxy
     restart: unless-stopped
     ports:
@@ -16,17 +27,8 @@ services:
       # Persist the CA cert + key across container recreation — losing
       # this means every client needs the new CA re-installed.
       - ssl_cert_data:/etc/squid/ssl_cert
-      # NOTE: ssl_db (the signed-cert cache) is intentionally NOT
-      # persisted on a volume. It's just a cache of already-issued
-      # fake leaf certificates for SSL-bumped sites — losing it on
-      # restart only costs a brief cache warm-up, nothing functional.
-      # security_file_certgen -c insists on creating this directory
-      # itself and fails with a generic "Cannot create" error if the
-      # path already exists (confirmed via strace: internal mkdir()
-      # call fails with EEXIST) — keeping it off a named volume avoids
-      # ever hitting that state.
       # Persist virus signatures so you're not re-downloading ~110MB on
-      # every container restart
+      # every container restart.
       - clamav_data:/var/lib/clamav
       # Shared with the dashboard service: the dashboard writes
       # rules.conf + list files + custom error templates here, and
@@ -34,16 +36,11 @@ services:
       # the dashboard signals a change.
       - squid_managed_config:/etc/squid/managed
       # Squid's access.log + cache.log — shared read-only with the
-      # dashboard so it can display a live log view. Backed by tmpfs
-      # (RAM, see the squid_logs volume definition) so logs never touch
-      # the SD card; they are intentionally not persisted across reboots.
+      # dashboard so it can display a live log view.
       - squid_logs:/var/log/squid
     # Ephemeral, write-heavy paths kept in RAM instead of the container
     # layer / SD card. Both paths hold the transient signed-cert cache
-    # (ssl_db), which entrypoint.sh initializes on boot — /var/lib/squid is
-    # what our Dockerfile configures, and /var/spool/squid is the Ubuntu
-    # package default that some squid-openssl builds resolve to. Neither
-    # survives a restart, which is fine (they're just caches).
+    # (ssl_db), which entrypoint.sh initializes on boot.
     tmpfs:
       - /var/lib/squid:size=64m
       - /var/spool/squid:size=32m
@@ -56,7 +53,7 @@ services:
     # network_mode: host   # uncomment if doing real transparent interception
 
   dashboard:
-    build: ./dashboard
+    image: ghcr.io/kulutchka/proxsea-dashboard:${PROXSEA_VERSION:-latest}
     container_name: proxsea-dashboard
     restart: unless-stopped
     environment:
