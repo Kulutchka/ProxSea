@@ -36,7 +36,7 @@ docker compose -f docker-compose.prod.yml up -d
 - **Explicit proxy** on port `3128` with SSL inspection of HTTPS (`CONNECT`) traffic.
 - **Transparent intercept** ports (`3129` HTTP, `3130` HTTPS) for gateway-style deployments.
 - **On-access malware scanning** — files downloaded through the proxy are checked by ClamAV via ICAP (request *and* response scanning).
-- **Web dashboard** (`:8080`) for configuration — no hand-editing of `squid.conf` required.
+- **Web dashboard** (`:8001`) for configuration — no hand-editing of `squid.conf` required.
 - **Allowlists & blocklists** with support for:
   - plain domain lists
   - `hosts`-file format (`0.0.0.0 example.com`)
@@ -73,7 +73,7 @@ docker compose -f docker-compose.prod.yml up -d
                                        │ (squid_managed_config, squid_logs, ssl_cert_data)
                         ┌──────────────▼───────────────────────────┐
                         │             proxsea-dashboard            │
-                        │   (Flask + SQLite + gunicorn, :5000→8080) │
+                        │   (Flask + SQLite + gunicorn, :5000→8001) │
                         │   writes rules.conf, lists, error pages  │
                         │   reads logs, serves /setup CA download  │
                         └──────────────────────────────────────────┘
@@ -173,7 +173,7 @@ docker compose logs -f
 
 ### 5. Log in to the dashboard
 
-Open **http://your-server-ip:8080** and log in with the `DASHBOARD_PASSWORD` you set (default `changeme` — change it).
+Open **http://your-server-ip:8001** and log in with the `DASHBOARD_PASSWORD` you set (default `changeme` — change it).
 
 ---
 
@@ -231,7 +231,7 @@ Adblock `@@` exception rules are honored: a `@@||example.com^` line in a block l
 
 ### Client setup
 
-Point end users at **http://your-server-ip:8080/setup** (no login required). The page provides:
+Point end users at **http://your-server-ip:8001/setup** (no login required). The page provides:
 
 - The `squidCA.der` CA certificate download (needed to trust SSL-inspected HTTPS).
 - Step-by-step trust instructions for **Windows, macOS, and Linux**.
@@ -253,7 +253,7 @@ Then configure clients to use the proxy:
 | `3128` | Squid explicit proxy | HTTP + SSL-bumped HTTPS (`CONNECT`) |
 | `3129` | Squid transparent HTTP intercept | |
 | `3130` | Squid transparent HTTPS intercept | SSL bump |
-| `8080` | Dashboard web UI | maps to `:5000` in the container |
+| `8001` | Dashboard web UI | maps to `:5000` in the container |
 | `1344` | c-icap (ICAP) | internal; not published by default |
 
 ---
